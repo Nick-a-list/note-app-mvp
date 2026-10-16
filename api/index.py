@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
+from urllib.parse import parse_qs, urlencode
+from fastapi import Request
 
 # Ensure the api/ directory is on sys.path for Vercel serverless execution
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -71,7 +73,24 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def restore_vercel_original_path(request: Request, call_next):
+    """Restore the original browser URL path when Vercel rewrites to /api/index."""
+    if request.scope.get("path") in ("/api/index", "/api/index.py"):
+        raw_qs = request.scope.get("query_string", b"").decode("utf-8")
+        params = parse_qs(raw_qs, keep_blank_values=True)
+        if "__path" in params:
+            real_path = params.pop("__path")[0]
+            if not real_path.startswith("/"):
+                real_path = "/" + real_path
+            request.scope["path"] = real_path
+            request.scope["raw_path"] = real_path.encode("utf-8")
+            request.scope["query_string"] = urlencode(params, doseq=True).encode("utf-8")
+    return await call_next(request)
+
 @app.get("/", include_in_schema=False)
+@app.get("/api/index", include_in_schema=False)
+@app.get("/api/index.py", include_in_schema=False)
 def serve_frontend():
     index_file = BASE_DIR / "static" / "index.html"
     if index_file.exists():
