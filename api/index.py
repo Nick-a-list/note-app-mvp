@@ -1,3 +1,4 @@
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
@@ -7,11 +8,19 @@ from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
-from . import models, schemas
-from .database import SessionLocal, engine, get_db
+# Ensure the api/ directory is on sys.path for Vercel serverless execution
+CURRENT_DIR = Path(__file__).resolve().parent
+BASE_DIR = CURRENT_DIR.parent
+if str(CURRENT_DIR) not in sys.path:
+    sys.path.insert(0, str(CURRENT_DIR))
 
-# Create tables in the database
-models.Base.metadata.create_all(bind=engine)
+try:
+    from . import models, schemas
+    from .database import SessionLocal, engine, get_db
+except ImportError:
+    import models
+    import schemas
+    from database import SessionLocal, engine, get_db
 
 
 def seed_default_folders(db: Session):
@@ -28,18 +37,22 @@ def seed_default_folders(db: Session):
     db.commit()
 
 
-# Seed on module load for serverless environments like Vercel
-with SessionLocal() as _init_db:
-    seed_default_folders(_init_db)
+def init_db_safe():
+    """Create tables and seed default folders without crashing serverless cold start."""
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        with SessionLocal() as db:
+            seed_default_folders(db)
+    except Exception as e:
+        print(f"Database init warning: {e}")
+
+
+init_db_safe()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db = SessionLocal()
-    try:
-        seed_default_folders(db)
-    finally:
-        db.close()
+    init_db_safe()
     yield
 
 
@@ -56,8 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 @app.get("/", include_in_schema=False)
