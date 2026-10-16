@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notes MVP — Secure & Aesthetic Note Taking</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom Folder Wallpapers */
+    .wp-default-paper {
+      background-color: #fbfaf8;
+      background-image: radial-gradient(#e5e0d8 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .wp-warm-grid {
+      background-color: #fffbeb;
+      background-image:
+        linear-gradient(to right, rgba(217, 119, 6, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(217, 119, 6, 0.08) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .wp-minimal-dots {
+      background-color: #f0fdf4;
+      background-image: radial-gradient(#86efac 1.2px, transparent 1.2px);
+      background-size: 20px 20px;
+    }
+    .wp-pastel-clouds {
+      background: linear-gradient(135deg, #fdf2f8 0%, #eef2ff 50%, #f0f9ff 100%);
+    }
+    .wp-lavender-dream {
+      background: linear-gradient(135deg, #f5f3ff 0%, #fae8ff 100%);
+    }
+  </style>
+</head>
+<body class="h-screen overflow-hidden flex bg-stone-100 text-stone-800 font-sans">
+
+  <!-- LEFT SIDEBAR: Smart Views & Custom Folders -->
+  <aside class="w-64 bg-stone-900 text-stone-100 flex flex-col justify-between p-4 select-none">
+    <div class="space-y-6 overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold tracking-tight text-amber-400">Notes MVP</h1>
+        <span class="text-xs bg-stone-800 text-stone-300 px-2 py-0.5 rounded">E2EE Ready</span>
+      </div>
+
+      <!-- Built-in Smart Folders -->
+      <div>
+        <p class="text-xs uppercase tracking-wider text-stone-400 font-semibold mb-2">Smart Views</p>
+        <ul id="smart-folders-list" class="space-y-1 text-sm">
+          <li><button onclick="selectSmartFolder('all')" id="sf-all" class="w-full text-left px-3 py-1.5 rounded hover:bg-stone-800 flex items-center justify-between"><span>📁 All Notes</span></button></li>
+          <li><button onclick="selectSmartFolder('quick')" id="sf-quick" class="w-full text-left px-3 py-1.5 rounded hover:bg-stone-800 flex items-center justify-between"><span>⚡ Quick Notes</span></button></li>
+          <li><button onclick="selectSmartFolder('bookmarks')" id="sf-bookmarks" class="w-full text-left px-3 py-1.5 rounded hover:bg-stone-800 flex items-center justify-between"><span>🔖 Bookmarked</span></button></li>
+          <li><button onclick="selectSmartFolder('todos')" id="sf-todos" class="w-full text-left px-3 py-1.5 rounded hover:bg-stone-800 flex items-center justify-between"><span>✅ All Todo Lists</span></button></li>
+          <li><button onclick="selectSmartFolder('most_used')" id="sf-most_used" class="w-full text-left px-3 py-1.5 rounded hover:bg-stone-800 flex items-center justify-between"><span>🔥 Top 20 Most Used</span></button></li>
+        </ul>
+      </div>
+
+      <!-- User Folders -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs uppercase tracking-wider text-stone-400 font-semibold">Folders</p>
+          <button onclick="createNewFolder()" class="text-xs text-amber-400 hover:underline">+ New</button>
+        </div>
+        <ul id="folders-list" class="space-y-1 text-sm"></ul>
+      </div>
+    </div>
+
+    <!-- Default Startup Folder Setting -->
+    <div class="pt-3 border-t border-stone-800 text-xs text-stone-400 space-y-1">
+      <label class="block font-medium text-stone-300">Startup Folder Behavior</label>
+      <select id="startup-pref" onchange="saveStartupPreference()" class="w-full bg-stone-800 text-stone-200 rounded px-2 py-1">
+        <option value="last">Open Last Used Folder</option>
+        <option value="all">Always Open All Notes</option>
+        <option value="quick">Always Open Quick Notes</option>
+      </select>
+    </div>
+  </aside>
+
+  <!-- MIDDLE PANE: Search, Bookmark Color Filter & Notes List -->
+  <section class="w-80 border-r border-stone-200 bg-white flex flex-col">
+    <div class="p-3 border-b border-stone-200 space-y-2">
+      <div class="flex items-center justify-between">
+        <h2 id="current-view-title" class="font-semibold text-stone-800 truncate">All Notes</h2>
+        <div class="flex gap-1">
+          <button onclick="createNewNote('regular')" title="New Regular Note" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded shadow-sm">+ Note</button>
+          <button onclick="createNewNote('todo')" title="New Todo List (Max 10)" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded shadow-sm">+ Todo</button>
+        </div>
+      </div>
+
+      <!-- Search Input -->
+      <input
+        id="search-input"
+        type="text"
+        placeholder="Search title or notes..."
+        oninput="loadNotes()"
+        class="w-full px-3 py-1.5 text-sm bg-stone-100 rounded border border-stone-200 focus:outline-none focus:border-amber-500"
+      />
+
+      <!-- Bookmark Color Filter -->
+      <div class="flex items-center justify-between text-xs text-stone-500 pt-1">
+        <span>Filter Bookmark:</span>
+        <div class="flex items-center gap-1.5">
+          <button onclick="setBookmarkFilter('')" class="px-1.5 py-0.5 rounded bg-stone-200 text-stone-700">All</button>
+          <button onclick="setBookmarkFilter('red')" class="w-4 h-4 rounded-full bg-rose-500" title="Red"></button>
+          <button onclick="setBookmarkFilter('yellow')" class="w-4 h-4 rounded-full bg-amber-400" title="Yellow"></button>
+          <button onclick="setBookmarkFilter('blue')" class="w-4 h-4 rounded-full bg-sky-500" title="Blue"></button>
+          <button onclick="setBookmarkFilter('green')" class="w-4 h-4 rounded-full bg-emerald-500" title="Green"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes List -->
+    <div id="notes-list" class="flex-1 overflow-y-auto divide-y divide-stone-100"></div>
+  </section>
+
+  <!-- RIGHT WORKSPACE: Note Editor & Folder Wallpaper -->
+  <main id="editor-workspace" class="flex-1 flex flex-col wp-default-paper transition-all duration-200">
+    <!-- Top Bar: Wallpaper Picker & Note Controls -->
+    <header class="px-6 py-3 bg-white/80 backdrop-blur border-b border-stone-200 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-2 text-xs">
+        <span class="font-medium text-stone-600">Folder Wallpaper:</span>
+        <select id="wallpaper-select" onchange="changeFolderWallpaper()" class="border border-stone-300 rounded px-2 py-1 bg-white text-stone-700">
+          <option value="default-paper">Classic Dot Paper</option>
+          <option value="warm-grid">Warm Aesthetic Grid</option>
+          <option value="minimal-dots">Mint Minimal Dots</option>
+          <option value="pastel-clouds">Pastel Clouds Gradient</option>
+          <option value="lavender-dream">Lavender Dream</option>
+        </select>
+      </div>
+
+      <div id="note-toolbar" class="hidden items-center gap-3 text-xs">
+        <!-- Global Priority Toggle -->
+        <label class="flex items-center gap-1 cursor-pointer bg-stone-100 px-2 py-1 rounded border border-stone-200">
+          <input type="checkbox" id="note-global" onchange="saveActiveNote()" />
+          <span>🌐 Global (All Folders)</span>
+        </label>
+
+        <!-- Bookmark & Color Selector -->
+        <div class="flex items-center gap-1 bg-stone-100 px-2 py-1 rounded border border-stone-200">
+          <label class="flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" id="note-bookmarked" onchange="saveActiveNote()" />
+            <span>🔖 Bookmark</span>
+          </label>
+          <select id="note-bookmark-color" onchange="saveActiveNote()" class="bg-transparent text-stone-700 focus:outline-none">
+            <option value="">No Color</option>
+            <option value="red">🔴 Red</option>
+            <option value="yellow">🟡 Yellow</option>
+            <option value="blue">🔵 Blue</option>
+            <option value="green">🟢 Green</option>
+          </select>
+        </div>
+
+        <!-- Client-Side Encryption Button -->
+        <button id="encrypt-btn" onclick="handleEncryptionAction()" class="px-2.5 py-1 rounded bg-stone-800 text-white hover:bg-stone-700">
+          🔒 Lock (Client E2EE)
+        </button>
+
+        <button onclick="deleteActiveNote()" class="px-2.5 py-1 rounded bg-rose-100 text-rose-700 hover:bg-rose-200">
+          Delete
+        </button>
+      </div>
+    </header>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="flex-1 flex items-center justify-center text-stone-400 text-sm">
+      Select a note on the left or click "+ Note" / "+ Todo" to start writing.
+    </div>
+
+    <!-- Active Note Editor -->
+    <div id="editor-container" class="hidden flex-1 flex flex-col p-8 max-w-3xl w-full mx-auto overflow-y-auto">
+      <div class="flex items-center justify-between mb-2 text-xs text-stone-400">
+        <span id="note-meta-info"></span>
+        <span id="save-status" class="text-emerald-600 font-medium"></span>
+      </div>
+
+      <input
+        id="note-title"
+        type="text"
+        placeholder="Note Title..."
+        oninput="debouncedSave()"
+        class="text-2xl font-bold bg-transparent border-b border-transparent focus:border-stone-300 focus:outline-none pb-2 mb-4 text-stone-900"
+      />
+
+      <!-- Regular Note Textarea -->
+      <textarea
+        id="note-content"
+        placeholder="Jot down your thoughts..."
+        oninput="debouncedSave()"
+        class="flex-1 w-full bg-white/75 backdrop-blur-sm p-4 rounded-xl border border-stone-200/80 shadow-sm focus:outline-none resize-none leading-relaxed text-stone-800"
+      ></textarea>
+
+      <!-- Todo List Mode (Tap to Disappear + Max 10 Constraint) -->
+      <div id="todo-container" class="hidden flex-1 flex flex-col bg-white/80 backdrop-blur-sm p-5 rounded-xl border border-stone-200 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="font-semibold text-stone-800">Tap-to-Disappear Todo List</h3>
+            <p class="text-xs text-stone-500">Tap any item to complete and remove it immediately.</p>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-stone-600">Max Rule Limit:</span>
+            <input
+              id="todo-max-rule"
+              type="number"
+              min="1"
+              max="50"
+              value="10"
+              onchange="saveActiveNote()"
+              class="w-14 px-2 py-1 border border-stone-300 rounded text-center font-semibold"
+            />
+            <span id="todo-count-badge" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">0 / 10</span>
+          </div>
+        </div>
+
+        <form onsubmit="addTodoItem(event)" class="flex gap-2 mb-4">
+          <input
+            id="new-todo-input"
+            type="text"
+            placeholder="Add a todo item (max limit enforced)..."
+            class="flex-1 px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:border-emerald-600"
+          />
+          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">
+            Add
+          </button>
+        </form>
+
+        <p id="todo-error" class="hidden text-xs text-rose-600 font-medium mb-2"></p>
+        <ul id="todo-items-list" class="space-y-2 overflow-y-auto"></ul>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let folders = [];
+    let notes = [];
+    let currentFolderId = null;
+    let currentSmartFolder = 'all';
+    let currentBookmarkColor = '';
+    let activeNote = null;
+    let decryptedPlaintextCache = {}; // Keeps unlocked plaintext strictly in browser memory
+    let saveTimer = null;
+
+    // --- CLIENT-SIDE WEB CRYPTO (AES-GCM + PBKDF2) ---
+    const enc = new TextEncoder();
+    const dec = new TextDecoder();
+
+    function bufToBase64(buf) {
+      return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    }
+    function base64ToBuf(b64) {
+      return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    }
+
+    async function deriveKey(passphrase, saltBytes) {
+      const keyMaterial = await window.crypto.subtle.importKey(
+        'raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
+      );
+      return window.crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: saltBytes, iterations: 100000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    }
+
+    async function encryptClientSide(plaintext, passphrase) {
+      const salt = window.crypto.getRandomValues(new Uint8Array(16));
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const key = await deriveKey(passphrase, salt);
+      const ciphertextBuf = await window.crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv }, key, enc.encode(plaintext)
+      );
+      return {
+        ciphertext: bufToBase64(ciphertextBuf),
+        iv: bufToBase64(iv),
+        salt: bufToBase64(salt)
+      };
+    }
+
+    async function decryptClientSide(ciphertextB64, ivB64, saltB64, passphrase) {
+      const key = await deriveKey(passphrase, base64ToBuf(saltB64));
+      const plainBuf = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: base64ToBuf(ivB64) },
+        key,
+        base64ToBuf(ciphertextB64)
+      );
+      return dec.decode(plainBuf);
+    }
+
+    // --- INITIALIZATION & STARTUP FOLDER PREFERENCE ---
+    async function initApp() {
+      await loadFolders();
+      const pref = localStorage.getItem('notes_startup_pref') || 'last';
+      document.getElementById('startup-pref').value = pref;
+
+      if (pref === 'all') {
+        selectSmartFolder('all');
+      } else if (pref === 'quick') {
+        selectSmartFolder('quick');
+      } else {
+        const lastFolderId = localStorage.getItem('notes_last_folder_id');
+        const lastSmart = localStorage.getItem('notes_last_smart_folder') || 'all';
+        if (lastFolderId && folders.some(f => f.id === Number(lastFolderId))) {
+          selectFolder(Number(lastFolderId));
+        } else {
+          selectSmartFolder(lastSmart);
+        }
+      }
+    }
+
+    function saveStartupPreference() {
+      const val = document.getElementById('startup-pref').value;
+      localStorage.setItem('notes_startup_pref', val);
+    }
+
+    // --- FOLDERS & WALLPAPERS ---
+    async function loadFolders() {
+      const res = await fetch('/api/folders');
+      folders = await res.json();
+      const list = document.getElementById('folders-list');
+      list.innerHTML = folders.map(f => `
+        <li>
+          <button onclick="selectFolder(${f.id})" class="w-full text-left px-3 py-1.5 rounded hover:bg-stone-800 flex items-center justify-between ${currentFolderId === f.id ? 'bg-stone-800 text-amber-400 font-semibold' : ''}">
+            <span class="truncate">📂 ${f.name}</span>
+          </button>
+        </li>
+      `).join('');
+      applyCurrentWallpaper();
+    }
+
+    async function createNewFolder() {
+      const name = prompt('Enter new folder name:');
+      if (!name || !name.trim()) return;
+      const res = await fetch('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), folder_type: 'regular', wallpaper: 'default-paper' })
+      });
+      if (res.ok) {
+        const created = await res.json();
+        await loadFolders();
+        selectFolder(created.id);
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Could not create folder');
+      }
+    }
+
+    function selectFolder(folderId) {
+      currentFolderId = folderId;
+      currentSmartFolder = null;
+      localStorage.setItem('notes_last_folder_id', String(folderId));
+      localStorage.removeItem('notes_last_smart_folder');
+      const folder = folders.find(f => f.id === folderId);
+      document.getElementById('current-view-title').textContent = folder ? folder.name : 'Folder';
+      loadFolders();
+      loadNotes();
+    }
+
+    function selectSmartFolder(smartKey) {
+      currentSmartFolder = smartKey;
+      currentFolderId = null;
+      localStorage.setItem('notes_last_smart_folder', smartKey);
+      localStorage.removeItem('notes_last_folder_id');
+      const titles = {
+        all: 'All Notes',
+        quick: 'Quick Notes',
+        bookmarks: 'Bookmarked Notes',
+        todos: 'All Todo Lists',
+        most_used: 'Top 20 Most Used'
+      };
+      document.getElementById('current-view-title').textContent = titles[smartKey] || 'Notes';
+      loadFolders();
+      loadNotes();
+    }
+
+    function applyCurrentWallpaper() {
+      const workspace = document.getElementById('editor-workspace');
+      const select = document.getElementById('wallpaper-select');
+      let wp = 'default-paper';
+      if (currentFolderId) {
+        const folder = folders.find(f => f.id === currentFolderId);
+        if (folder) wp = folder.wallpaper;
+      } else if (activeNote) {
+        const folder = folders.find(f => f.id === activeNote.folder_id);
+        if (folder) wp = folder.wallpaper;
+      }
+      select.value = wp;
+      workspace.className = `flex-1 flex flex-col transition-all duration-200 wp-${wp}`;
+    }
+
+    async function changeFolderWallpaper() {
+      const targetFolderId = currentFolderId || (activeNote ? activeNote.folder_id : (folders[0] && folders[0].id));
+      if (!targetFolderId) return;
+      const wp = document.getElementById('wallpaper-select').value;
+      await fetch(`/api/folders/${targetFolderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallpaper: wp })
+      });
+      await loadFolders();
+    }
+
+    // --- NOTES LIST & SEARCH ---
+    function setBookmarkFilter(color) {
+      currentBookmarkColor = color;
+      loadNotes();
+    }
+
+    async function loadNotes() {
+      const params = new URLSearchParams();
+      if (currentFolderId) params.set('folder_id', currentFolderId);
+      if (currentSmartFolder) params.set('smart_folder', currentSmartFolder);
+      if (currentBookmarkColor) params.set('bookmark_color', currentBookmarkColor);
+      const searchVal = document.getElementById('search-input').value.trim();
+      if (searchVal) params.set('search', searchVal);
+
+      const res = await fetch(`/api/notes?${params.toString()}`);
+      notes = await res.json();
+      renderNotesList();
+    }
+
+    function renderNotesList() {
+      const container = document.getElementById('notes-list');
+      if (!notes.length) {
+        container.innerHTML = `<p class="p-6 text-xs text-stone-400 text-center">No notes found in this view.</p>`;
+        return;
+      }
+      const colorDot = {
+        red: 'bg-rose-500',
+        yellow: 'bg-amber-400',
+        blue: 'bg-sky-500',
+        green: 'bg-emerald-500'
+      };
+      container.innerHTML = notes.map(n => `
+        <div onclick="openNote(${n.id})" class="p-3.5 cursor-pointer hover:bg-stone-50 transition ${activeNote && activeNote.id === n.id ? 'bg-amber-50/80 border-l-4 border-amber-500' : ''}">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <h4 class="font-semibold text-sm text-stone-800 truncate">${escapeHtml(n.title || 'Untitled')}</h4>
+            <div class="flex items-center gap-1 shrink-0">
+              ${n.is_global ? '<span title="Global Note">🌐</span>' : ''}
+              ${n.is_encrypted ? '<span title="Client-Side Encrypted">🔒</span>' : ''}
+              ${n.is_bookmarked ? '<span>🔖</span>' : ''}
+              ${n.bookmark_color && colorDot[n.bookmark_color] ? `<span class="w-2.5 h-2.5 rounded-full ${colorDot[n.bookmark_color]}"></span>` : ''}
+            </div>
+          </div>
+          <p class="text-xs text-stone-500 truncate">
+            ${n.note_type === 'todo'
+              ? `✅ Todo List (${(n.todo_items \vert{}\vert{} []).length}/${n.max_items_rule} items)`
+              : (n.is_encrypted ? 'Encrypted payload (key required)' : escapeHtml(n.content || 'No additional text'))}
+          </p>
+          <p class="text-[11px] text-stone-400 mt-1">Views: ${n.view_count}</p>
+        </div>
+      `).join('');
+    }
+
+    async function createNewNote(noteType) {
+      const targetFolderId = currentFolderId || (folders[0] && folders[0].id);
+      if (!targetFolderId) return;
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folder_id: targetFolderId,
+          title: noteType === 'todo' ? 'New Todo List' : 'Untitled Note',
+          content: '',
+          note_type: noteType,
+          todo_items: [],
+          max_items_rule: 10
+        })
+      });
+      if (res.ok) {
+        const created = await res.json();
+        await loadNotes();
+        openNote(created.id);
+      }
+    }
+
+    async function openNote(noteId) {
+      const res = await fetch(`/api/notes/${noteId}`);
+      if (!res.ok) return;
+      activeNote = await res.json();
+      applyCurrentWallpaper();
+
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('editor-container').classList.remove('hidden');
+      document.getElementById('note-toolbar').classList.remove('hidden');
+      document.getElementById('note-toolbar').classList.add('flex');
+
+      document.getElementById('note-title').value = activeNote.title;
+      document.getElementById('note-global').checked = activeNote.is_global;
+      document.getElementById('note-bookmarked').checked = activeNote.is_bookmarked;
+      document.getElementById('note-bookmark-color').value = activeNote.bookmark_color || '';
+      document.getElementById('note-meta-info').textContent = `Opened ${activeNote.view_count} times • Folder #${activeNote.folder_id}`;
+
+      const encryptBtn = document.getElementById('encrypt-btn');
+      const contentBox = document.getElementById('note-content');
+      const todoContainer = document.getElementById('todo-container');
+
+      if (activeNote.note_type === 'todo') {
+        contentBox.classList.add('hidden');
+        todoContainer.classList.remove('hidden');
+        renderTodoItems();
+      } else {
+        todoContainer.classList.add('hidden');
+        contentBox.classList.remove('hidden');
+
+        if (activeNote.is_encrypted) {
+          if (decryptedPlaintextCache[activeNote.id] !== undefined) {
+            contentBox.value = decryptedPlaintextCache[activeNote.id];
+            contentBox.disabled = false;
+            encryptBtn.textContent = '🔓 Remove Encryption';
+          } else {
+            contentBox.value = `🔒 [CLIENT-SIDE ENCRYPTED CIPHERTEXT]\n\n${activeNote.content}\n\nClick "Unlock Note" in the top bar to decrypt locally in your browser.`;
+            contentBox.disabled = true;
+            encryptBtn.textContent = '🔑 Unlock Note';
+          }
+        } else {
+          contentBox.value = activeNote.content;
+          contentBox.disabled = false;
+          encryptBtn.textContent = '🔒 Lock (Client E2EE)';
+        }
+      }
+      renderNotesList();
+    }
+
+    function debouncedSave() {
+      document.getElementById('save-status').textContent = 'Saving...';
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveActiveNote, 400);
+    }
+
+    async function saveActiveNote() {
+      if (!activeNote) return;
+      const isBookmarked = document.getElementById('note-bookmarked').checked;
+      const colorVal = document.getElementById('note-bookmark-color').value || null;
+
+      const payload = {
+        title: document.getElementById('note-title').value,
+        is_global: document.getElementById('note-global').checked,
+        is_bookmarked: isBookmarked,
+        bookmark_color: isBookmarked ? colorVal : null,
+        max_items_rule: Number(document.getElementById('todo-max-rule').value || 10)
+      };
+
+      if (activeNote.note_type === 'regular' && !activeNote.is_encrypted) {
+        payload.content = document.getElementById('note-content').value;
+      }
+
+      const res = await fetch(`/api/notes/${activeNote.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        activeNote = await res.json();
+        document.getElementById('save-status').textContent = 'Saved ✓';
+        loadNotes();
+      }
+    }
+
+    // --- CLIENT-SIDE ENCRYPTION HANDLER ---
+    async function handleEncryptionAction() {
+      if (!activeNote) return;
+
+      // Case 1: Note is not encrypted -> Encrypt in browser before sending to server
+      if (!activeNote.is_encrypted) {
+        const pass = prompt('Set a passphrase to encrypt this note client-side (server never sees your key):');
+        if (!pass) return;
+        const plaintext = document.getElementById('note-content').value;
+        const encrypted = await encryptClientSide(plaintext, pass);
+
+        const res = await fetch(`/api/notes/${activeNote.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: encrypted.ciphertext,
+            is_encrypted: true,
+            encryption_iv: encrypted.iv,
+            encryption_salt: encrypted.salt
+          })
+        });
+        if (res.ok) {
+          delete decryptedPlaintextCache[activeNote.id];
+          await openNote(activeNote.id);
+          await loadNotes();
+        }
+        return;
+      }
+
+      // Case 2: Encrypted and locked -> Decrypt locally
+      if (decryptedPlaintextCache[activeNote.id] === undefined) {
+        const pass = prompt('Enter passphrase to decrypt note in your browser:');
+        if (!pass) return;
+        try {
+          const plaintext = await decryptClientSide(
+            activeNote.content, activeNote.encryption_iv, activeNote.encryption_salt, pass
+          );
+          decryptedPlaintextCache[activeNote.id] = plaintext;
+          await openNote(activeNote.id);
+        } catch (e) {
+          alert('Decryption failed: Incorrect passphrase.');
+        }
+      } else {
+        // Case 3: Already unlocked -> Remove encryption
+        const plain = document.getElementById('note-content').value;
+        const res = await fetch(`/api/notes/${activeNote.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: plain,
+            is_encrypted: false,
+            encryption_iv: null,
+            encryption_salt: null
+          })
+        });
+        if (res.ok) {
+          delete decryptedPlaintextCache[activeNote.id];
+          await openNote(activeNote.id);
+          await loadNotes();
+        }
+      }
+    }
+
+    // --- TAP-TO-DISAPPEAR TODO LIST + RULE CONSTRAINT ---
+    function renderTodoItems() {
+      const items = activeNote.todo_items || [];
+      const maxRule = activeNote.max_items_rule || 10;
+      document.getElementById('todo-max-rule').value = maxRule;
+      document.getElementById('todo-count-badge').textContent = `${items.length} / ${maxRule}`;
+      document.getElementById('todo-error').classList.add('hidden');
+
+      const list = document.getElementById('todo-items-list');
+      if (!items.length) {
+        list.innerHTML = `<li class="text-xs text-stone-400 italic py-4 text-center">No pending todos! Add one above.</li>`;
+        return;
+      }
+      list.innerHTML = items.map((text, idx) => `
+        <li
+          onclick="tapToDisappearTodo(${idx})"
+          class="group flex items-center justify-between px-3.5 py-2.5 bg-stone-50 hover:bg-emerald-50 border border-stone-200 rounded-lg cursor-pointer transition"
+          title="Tap to complete and make disappear"
+        >
+          <div class="flex items-center gap-3">
+            <span class="w-4 h-4 rounded-full border-2 border-stone-400 group-hover:bg-emerald-500 group-hover:border-emerald-500 transition"></span>
+            <span class="text-sm text-stone-800 group-hover:line-through group-hover:text-stone-400">${escapeHtml(text)}</span>
+          </div>
+          <span class="text-xs text-emerald-600 opacity-0 group-hover:opacity-100 font-medium">Tap to clear ✓</span>
+        </li>
+      `).join('');
+    }
+
+    async function addTodoItem(e) {
+      e.preventDefault();
+      if (!activeNote) return;
+      const input = document.getElementById('new-todo-input');
+      const errEl = document.getElementById('todo-error');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const res = await fetch(`/api/notes/${activeNote.id}/todos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+
+      if (res.ok) {
+        input.value = '';
+        activeNote = await res.json();
+        renderTodoItems();
+        loadNotes();
+      } else {
+        const err = await res.json();
+        errEl.textContent = err.detail || 'Rule limit reached!';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    async function tapToDisappearTodo(index) {
+      if (!activeNote) return;
+      const res = await fetch(`/api/notes/${activeNote.id}/todos/${index}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        activeNote = await res.json();
+        renderTodoItems();
+        loadNotes();
+      }
+    }
+
+    async function deleteActiveNote() {
+      if (!activeNote || !confirm('Delete this note permanently?')) return;
+      const res = await fetch(`/api/notes/${activeNote.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        activeNote = null;
+        document.getElementById('editor-container').classList.add('hidden');
+        document.getElementById('note-toolbar').classList.add('hidden');
+        document.getElementById('empty-state').classList.remove('hidden');
+        loadNotes();
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, s => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[s]));
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
