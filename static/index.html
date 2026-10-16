@@ -229,7 +229,7 @@
               ${n.is_global ? '🌐' : ''} ${n.is_encrypted ? '🔒' : ''} ${n.is_bookmarked ? '🔖' : ''}
             </div>
           </div>
-          <p class="text-xs text-stone-500 truncate">${n.note_type === 'todo' ? `✅ Todo List (${(n.todo_items \vert{}\vert{} []).length}/${n.max_items_rule})` : (n.is_encrypted ? 'Encrypted' : (n.content || ''))}</p>
+          <p class="text-xs text-stone-500 truncate">${n.note_type === 'todo' ? `✅ Todo List (${(n.todo_items || []).length}/${n.max_items_rule})` : (n.is_encrypted ? 'Encrypted' : (n.content || ''))}</p>
         </div>
       `).join('');
     }
