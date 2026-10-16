@@ -1,15 +1,14 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .database import SessionLocal, engine, get_db
-
-from pathlib import Path
-from fastapi.responses import FileResponse
 
 # Create tables in the database
 models.Base.metadata.create_all(bind=engine)
@@ -27,6 +26,11 @@ def seed_default_folders(db: Session):
         if not exists:
             db.add(models.Folder(**folder_data))
     db.commit()
+
+
+# Seed immediately at module load as well (Vercel serverless does not always run ASGI lifespan)
+with SessionLocal() as _init_db:
+    seed_default_folders(_init_db)
 
 
 @asynccontextmanager
@@ -57,8 +61,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 @app.get("/", include_in_schema=False)
+@app.get("/api/index.py", include_in_schema=False)
+@app.get("/api/index", include_in_schema=False)
 def serve_frontend():
-    return FileResponse(BASE_DIR / "static" / "index.html")
+    index_file = BASE_DIR / "static" / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return HTMLResponse("<h1>static/index.html not found in deployment bundle</h1>", status_code=500)
 
 
 @app.get("/api/health")

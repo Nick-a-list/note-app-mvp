@@ -2,7 +2,9 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./notes.db")
+# On Vercel serverless, only /tmp is writable if no external DATABASE_URL is configured yet
+default_sqlite = "sqlite:////tmp/notes.db" if os.getenv("VERCEL") else "sqlite:///./notes.db"
+DATABASE_URL = os.getenv("DATABASE_URL", default_sqlite)
 
 # Handle Heroku/Vercel postgres:// prefix if present
 if DATABASE_URL.startswith("postgres://"):
