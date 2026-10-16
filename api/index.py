@@ -28,7 +28,7 @@ def seed_default_folders(db: Session):
     db.commit()
 
 
-# Seed immediately at module load as well (Vercel serverless does not always run ASGI lifespan)
+# Seed on module load for serverless environments like Vercel
 with SessionLocal() as _init_db:
     seed_default_folders(_init_db)
 
@@ -67,7 +67,7 @@ def serve_frontend():
     index_file = BASE_DIR / "static" / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
-    return HTMLResponse("<h1>static/index.html not found in deployment bundle</h1>", status_code=500)
+    return HTMLResponse("<h1>Frontend not found</h1>", status_code=404)
 
 
 @app.get("/api/health")
@@ -139,7 +139,6 @@ def list_notes(
 ):
     query = db.query(models.Note)
 
-    # Smart Folder routing
     if smart_folder == "bookmarks":
         query = query.filter(models.Note.is_bookmarked.is_(True))
     elif smart_folder == "todos":
@@ -157,30 +156,25 @@ def list_notes(
             .all()
         )
     elif folder_id is not None:
-        # Include notes belonging to the folder PLUS any note marked global
         query = query.filter(
             or_(models.Note.folder_id == folder_id, models.Note.is_global.is_(True))
         )
 
-    # Bookmark color filter
     if bookmark_color:
         query = query.filter(
             models.Note.is_bookmarked.is_(True),
             models.Note.bookmark_color == bookmark_color,
         )
 
-    # Keyword search filter
     if search:
         pattern = f"%{search}%"
         query = query.filter(
             or_(
                 models.Note.title.ilike(pattern),
-                # Only search body content when note is not client-side encrypted
                 (models.Note.is_encrypted.is_(False) & models.Note.content.ilike(pattern)),
             )
         )
 
-    # Order: Global priority first, Bookmarked notes second, most recently updated third
     return query.order_by(
         desc(models.Note.is_global),
         desc(models.Note.is_bookmarked),
@@ -194,7 +188,6 @@ def get_note(note_id: int, db: Session = Depends(get_db)):
     if not note:
         raise HTTPException(status_code=404, detail="Note not found.")
 
-    # Increment view_count for the "Most Used (Top 20)" smart folder
     note.view_count += 1
     db.commit()
     db.refresh(note)
@@ -222,7 +215,6 @@ def update_note(note_id: int, note_in: schemas.NoteUpdate, db: Session = Depends
 
     update_data = note_in.model_dump(exclude_unset=True)
 
-    # Enforce todo list max_items_rule constraint on updates
     new_type = update_data.get("note_type", note.note_type)
     new_todos = update_data.get("todo_items", note.todo_items)
     new_max = update_data.get("max_items_rule", note.max_items_rule)
