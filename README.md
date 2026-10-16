@@ -4,7 +4,7 @@ A secure, aesthetic note-taking web app with folders, todo lists, bookmarks, and
 
 **Live demo:** https://note-app-mvp.vercel.app
 
-Built for CS 4800 (Software Engineering with AI) by Nicholas Barker.
+Built for CS 4800 (Software Engineering with AI) by Nicholas Barkero.
 
 ## Features
 
